@@ -3,10 +3,11 @@ import numpy as np
 import pandas as pd
 import pyautogui
 from PIL import Image, ImageTk
-from pytesseract import image_to_data
+from pytesseract import image_to_data, pytesseract
 import tkinter as tk
 from tkinter import messagebox
 
+pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 class RegionSelector(tk.Tk):
     def __init__(self, *args, **kwargs):
@@ -64,7 +65,6 @@ def detect_tables(image):
         print("Error detecting tables:", e)
         return []
 
-
 def table_to_tsv(image, table_contour, output_file, append_mode=False):
     try:
         x, y, w, h = cv2.boundingRect(table_contour)
@@ -76,6 +76,7 @@ def table_to_tsv(image, table_contour, output_file, append_mode=False):
             print("Warning: OCR results may not be satisfactory.")
             return
 
+        table_data['text'] = table_data['text'].astype(str)  # Add this line to convert the text column to strings
         table = pd.DataFrame(table_data.groupby(['block_num', 'par_num', 'line_num', 'word_num'])['text'].apply(' '.join).reset_index())
         table = table.pivot_table(values='text', index=['block_num', 'par_num', 'line_num'], columns=['word_num'], aggfunc='first').reset_index(drop=True)
         mode = 'a' if append_mode else 'w'

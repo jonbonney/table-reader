@@ -83,7 +83,6 @@ def table_to_tsv(image, table_contour, output_file, append_mode=False):
         table.to_csv(output_file, sep='\t', index=False, header=not append_mode, mode=mode)
     except Exception as e:
         print("Error transcribing table:", e)
-
 def main():
     app = RegionSelector()
     app.mainloop()
@@ -100,12 +99,21 @@ def main():
 
     output_file = 'output.tsv'
     append_mode = False
+    error_occurred = False  # Add this line to initialize the error flag
 
     for table_contour in tables:
-        table_to_tsv(screenshot, table_contour, output_file, append_mode)
-        append_mode = True
+        try:
+            table_to_tsv(screenshot, table_contour, output_file, append_mode)
+            append_mode = True
+        except Exception as e:
+            print("Error transcribing table:", e)
+            error_occurred = True  # Set the error flag if an exception occurs
 
-    messagebox.showinfo("Success", "Table transcription completed. Data saved to output.tsv.")
+    if error_occurred:
+        messagebox.showerror("Error", "An error occurred during table transcription. Check the console for more details.")
+    else:
+        messagebox.showinfo("Success", "Table transcription completed. Data saved to output.tsv.")
+
 
 if __name__ == '__main__':
     main()

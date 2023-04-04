@@ -2,17 +2,55 @@ import cv2
 import numpy as np
 import pandas as pd
 import pyautogui
-from PIL import Image
+from PIL import Image, ImageTk
 from pytesseract import image_to_data
+import tkinter as tk
+from tkinter import messagebox
 
-def capture_screenshot():
-    try:
-        screenshot = pyautogui.screenshot()
-        screenshot = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-        return screenshot
-    except Exception as e:
-        print("Error capturing screenshot:", e)
-        return None
+
+class RegionSelector(tk.Tk):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.title("Select Screenshot Region")
+
+        self.screenshot = None
+        self.region = (0, 0, 0, 0)
+
+        self.canvas = tk.Canvas(self, width=300, height=300, bg="white")
+        self.canvas.pack(expand=True, fill=tk.BOTH)
+
+        self.bind("<ButtonPress-1>", self.on_button_press)
+        self.bind("<B1-Motion>", self.on_button_motion)
+        self.bind("<ButtonRelease-1>", self.on_button_release)
+
+        self.rect = None
+
+    def on_button_press(self, event):
+        if self.rect:
+            self.canvas.delete(self.rect)
+            self.rect = None
+
+        self.start_x = event.x
+        self.start_y = event.y
+
+    def on_button_motion(self, event):
+        if self.rect:
+            self.canvas.delete(self.rect)
+
+        self.rect = self.canvas.create_rectangle(self.start_x, self.start_y, event.x, event.y, outline="red")
+
+    def on_button_release(self, event):
+        self.end_x = event.x
+        self.end_y = event.y
+        self.region = (self.start_x, self.start_y, self.end_x, self.end_y)
+        self.capture_screenshot()
+
+    def capture_screenshot(self):
+        self.screenshot = pyautogui.screenshot(region=self.region)
+        self.screenshot = cv2.cvtColor(np.array(self.screenshot), cv2.COLOR_RGB2BGR)
+        self.quit()
+
 
 def detect_tables(image):
     try:
@@ -25,6 +63,7 @@ def detect_tables(image):
     except Exception as e:
         print("Error detecting tables:", e)
         return []
+
 
 def table_to_tsv(image, table_contour, output_file, append_mode=False):
     try:
@@ -45,14 +84,17 @@ def table_to_tsv(image, table_contour, output_file, append_mode=False):
         print("Error transcribing table:", e)
 
 def main():
-    screenshot = capture_screenshot()
+    app = RegionSelector()
+    app.mainloop()
+
+    screenshot = app.screenshot
     if screenshot is None:
-        print("Unable to capture a screenshot. Exiting.")
+        messagebox.showerror("Error", "Unable to capture a screenshot.")
         return
 
     tables = detect_tables(screenshot)
     if not tables:
-        print("No tables detected. Exiting.")
+        messagebox.showerror("Error", "No tables detected.")
         return
 
     output_file = 'output.tsv'
@@ -61,6 +103,8 @@ def main():
     for table_contour in tables:
         table_to_tsv(screenshot, table_contour, output_file, append_mode)
         append_mode = True
+
+    messagebox.showinfo("Success", "Table transcription completed. Data saved to output.tsv.")
 
 if __name__ == '__main__':
     main()

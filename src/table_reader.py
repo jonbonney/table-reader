@@ -14,11 +14,18 @@ class RegionSelector(tk.Tk):
         super().__init__(*args, **kwargs)
 
         self.title("Select Screenshot Region")
+        self.attributes('-alpha', 0.3)  # Set the window opacity to 0.3
+        self.attributes('-fullscreen', True)  # Make the window fullscreen
 
         self.screenshot = None
         self.region = (0, 0, 0, 0)
 
-        self.canvas = tk.Canvas(self, width=300, height=300, bg="white")
+        # Set the canvas size to the screen size
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+
+        # Create a transparent canvas
+        self.canvas = tk.Canvas(self, width=screen_width, height=screen_height, bg="white")
         self.canvas.pack(expand=True, fill=tk.BOTH)
 
         self.bind("<ButtonPress-1>", self.on_button_press)
@@ -83,6 +90,8 @@ def table_to_tsv(image, table_contour, output_file, append_mode=False):
         table.to_csv(output_file, sep='\t', index=False, header=not append_mode, mode=mode)
     except Exception as e:
         print("Error transcribing table:", e)
+
+
 def main():
     app = RegionSelector()
     app.mainloop()

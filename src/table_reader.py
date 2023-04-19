@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import pandas as pd
-import pyautogui
+from mss import mss
 from PIL import Image, ImageTk
 from pytesseract import image_to_data, pytesseract
 import tkinter as tk
@@ -56,9 +56,6 @@ class RegionSelector(tk.Tk):
         self.capture_screenshot()
 
     def capture_screenshot(self):
-        self.screenshot = pyautogui.screenshot(region=self.region)
-        self.screenshot = cv2.cvtColor(np.array(self.screenshot), cv2.COLOR_RGB2BGR)
-        self.quit()
         region = {
             "top": self.start_y,
             "left": self.start_x,

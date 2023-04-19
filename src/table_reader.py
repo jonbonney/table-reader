@@ -91,39 +91,29 @@ class ImageSaver:
 def detect_tables(image):
     try:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
-        rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (18, 18))
-        dilation = cv2.dilate(thresh, rect_kernel, iterations=1)
-        contours, _ = cv2.findContours(dilation, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        return gray, thresh, dilation, contours
+        ocr_data = image_to_data(gray, output_type='data.frame')
+        ocr_data = ocr_data[(ocr_data.conf != '-1') & (ocr_data.text != '')]
+        return gray, ocr_data
     except Exception as e:
         print("Error detecting tables:", e)
-        return [], [], [], []
+        return [], []
 
 
 
-def table_to_tsv(image, table_contour, output_file, append_mode=False):
-    processed_images = []
+
+def table_to_tsv(ocr_data, output_file, append_mode=False):
     try:
-        x, y, w, h = cv2.boundingRect(table_contour)
-        table_image = image[y:y+h, x:x+w]
-        processed_images.append(('Table Image', cv2.cvtColor(table_image, cv2.COLOR_BGR2RGB)))
-        table_data = image_to_data(table_image, output_type='data.frame')
-        table_data = table_data[(table_data.conf != '-1') & (table_data.text != '')]
-
-        if len(table_data) == 0:
+        if len(ocr_data) == 0:
             print("Warning: OCR results may not be satisfactory.")
-            return processed_images
+            return
 
-        table_data['text'] = table_data['text'].astype(str)  # Add this line to convert the text column to strings
-        table = pd.DataFrame(table_data.groupby(['block_num', 'par_num', 'line_num', 'word_num'])['text'].apply(' '.join).reset_index())
+        ocr_data['text'] = ocr_data['text'].astype(str)  # Convert the text column to strings
+        table = pd.DataFrame(ocr_data.groupby(['block_num', 'par_num', 'line_num', 'word_num'])['text'].apply(' '.join).reset_index())
         table = table.pivot_table(values='text', index=['block_num', 'par_num', 'line_num'], columns=['word_num'], aggfunc='first').reset_index(drop=True)
         mode = 'a' if append_mode else 'w'
         table.to_csv(output_file, sep='\t', index=False, header=not append_mode, mode=mode)
     except Exception as e:
         print("Error transcribing table:", e)
-
-    return processed_images
 
 
 def main():
@@ -135,9 +125,9 @@ def main():
         messagebox.showerror("Error", "Unable to capture a screenshot.")
         return
 
-    gray, thresh, dilation, tables = detect_tables(screenshot)
+    gray, ocr_data = detect_tables(screenshot)
 
-    if not tables:
+    if ocr_data.empty:
         messagebox.showerror("Error", "No tables detected.")
         return
 
@@ -148,17 +138,12 @@ def main():
     processed_images = [
         ('Original Image', cv2.cvtColor(screenshot, cv2.COLOR_BGR2RGB)),
         ('Gray Image', cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)),
-        ('Thresh Image', cv2.cvtColor(thresh, cv2.COLOR_GRAY2RGB)),
-        ('Dilation Image', cv2.cvtColor(dilation, cv2.COLOR_GRAY2RGB)),
     ]
-    for table_contour in tables:
-        try:
-            table_images = table_to_tsv(screenshot, table_contour, output_file, append_mode)
-            processed_images.extend(table_images)
-            append_mode = True
-        except Exception as e:
-            print("Error transcribing table:", e)
-            error_occurred = True  # Set the error flag if an exception occurs
+    try:
+        table_to_tsv(ocr_data, output_file, append_mode)
+    except Exception as e:
+        print("Error transcribing table:", e)
+        error_occurred = True  # Set the error flag if an exception occurs
 
     if not processed_images:
         messagebox.showerror("Error", "No processed images to display.")
